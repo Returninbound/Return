@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BKK1 — ระบบรับกลับ v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117; --surface: #1a1d27; --card: #21253a; --border: #2e3350;
+  --accent: #4f8ef7; --accent2: #7c5cfc; --green: #22c55e; --amber: #f59e0b;
+  --red: #ef4444; --text: #e8eaf6; --muted: #8891b2;
+}
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+/* NAV */
+nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; display: flex; align-items: center; gap: 4px; height: 52px; position: sticky; top: 0; z-index: 200; }
+nav .logo { font-weight: 700; font-size: 16px; color: var(--accent); margin-right: 16px; letter-spacing: 1px; white-space: nowrap; }
+.tab { padding: 6px 15px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; transition: all .2s; white-space: nowrap; }
+.tab.active { background: var(--card); color: var(--text); }
+.tab.t1.active { color: var(--accent); border-bottom: 2px solid var(--accent); border-radius: 8px 8px 0 0; }
+.tab.t2.active { color: var(--accent2); border-bottom: 2px solid var(--accent2); border-radius: 8px 8px 0 0; }
+.tab.t3.active { color: var(--green); border-bottom: 2px solid var(--green); border-radius: 8px 8px 0 0; }
+
+/* CLOCK */
+.clock { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--muted); font-family: monospace; white-space: nowrap; }
+
+/* PAGE */
+.page { display: none; padding: 20px; max-width: 920px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* CARDS & INPUTS */
+.box { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+.box-title { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 12px; }
+.row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+.inp { flex: 1; min-width: 160px; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); padding: 11px 14px; font-size: 14px; outline: none; transition: border .2s; }
+.inp:focus { border-color: var(--accent); }
+.btn { padding: 11px 20px; border-radius: 10px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .18s; white-space: nowrap; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #3d7de0; }
+.btn-success { background: #0c2d1a; color: var(--green); border: 1.5px solid var(--green); }
+.btn-danger { background: #2d0f0f; color: var(--red); border: 1.5px solid var(--red); }
+.btn-purple { background: #1a0f3d; color: var(--accent2); border: 1.5px solid var(--accent2); }
+.btn-sm { padding: 7px 13px; font-size: 12px; border-radius: 8px; }
+.btn-export { background: #0f2d1f; color: var(--green); border: 1.5px solid var(--green); padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* AUTOCOMPLETE */
+.ac-wrap { position: relative; flex: 1; min-width: 160px; }
+.ac-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--card); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 500; max-height: 200px; overflow-y: auto; box-shadow: 0 8px 24px #0008; }
+.ac-item { padding: 9px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover { background: #2a2f50; }
+.ac-set { font-weight: 700; color: var(--text); min-width: 120px; }
+.ac-desc { color: var(--muted); font-size: 12px; }
+.ac-type-i { color: var(--accent); font-size: 11px; font-weight: 700; }
+.ac-type-p { color: var(--accent2); font-size: 11px; font-weight: 700; }
+
+/* MATCH INFO */
+.match-info { background: #0f2030; border: 1px solid #1e5080; border-radius: 8px; padding: 9px 14px; font-size: 13px; color: #7bb5e8; margin-top: 8px; }
+
+/* TABLE */
+.tbl-wrap { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+.tbl-head { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: var(--card); }
+.tbl-head-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+table { width: 100%; border-collapse: collapse; }
+th { padding: 9px 13px; text-align: left; font-size: 11px; color: var(--muted); font-weight: 700; background: var(--card); border-bottom: 1px solid var(--border); letter-spacing: .4px; }
+td { padding: 10px 13px; font-size: 13px; border-bottom: 1px solid #1e2236; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #1e2236; }
+
+/* BADGES */
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.bg-blue { background: #0f1e3d; color: var(--accent); }
+.bg-purple { background: #1a0f3d; color: var(--accent2); }
+.bg-green { background: #0f2d1f; color: var(--green); }
+.bg-amber { background: #2d1f0a; color: var(--amber); }
+.bg-red { background: #2d0f0f; color: var(--red); }
+.area-badge { background: #1a2240; color: var(--accent); border: 1px solid #2e4280; border-radius: 6px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+
+/* SUBMIT BAR */
+.submit-bar { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ORDER CARD */
+.order-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+.order-card-head { padding: 13px 17px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); background: var(--card); gap: 10px; }
+.order-no { font-size: 15px; font-weight: 700; color: var(--accent); }
+.order-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 5px; }
+.ts-chip { font-size: 11px; background: #1a1035; color: var(--accent2); padding: 3px 9px; border-radius: 6px; }
+.ts-chip.done { background: #0f2d1f; color: var(--green); }
+.order-body { padding: 14px 17px; }
+
+/* PHOTOS */
+.photos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.photo-slot { background: var(--card); border: 1.5px dashed var(--border); border-radius: 10px; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--muted); position: relative; overflow: hidden; cursor: pointer; transition: border .2s; }
+.photo-slot:hover { border-color: var(--accent2); }
+.photo-slot input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.photo-slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 9px; }
+.photo-slot .rm { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.65); border: none; border-radius: 50%; width: 22px; height: 22px; color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 3; }
+.photo-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.photo-ts { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* ACTION ROW */
+.action-row { margin-top: 13px; display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+select { background: var(--card); border: 1.5px solid var(--border); color: var(--text); padding: 10px 13px; border-radius: 10px; font-size: 13px; outline: none; cursor: pointer; flex: 1; min-width: 140px; }
+
+/* STATS */
+.stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 18px; }
+.stat-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 15px 17px; }
+.stat-label { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.stat-val { font-size: 28px; font-weight: 800; }
+
+/* FILTER BAR */
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.fbtn { background: var(--card); border: 1.5px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 13px; font-size: 13px; cursor: pointer; transition: all .18s; }
+.fbtn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.date-inp { background: var(--card); border: 1.5px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 9px; font-size: 13px; outline: none; }
+
+/* ITEMS CHIPS */
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.chip { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; font-size: 12px; color: var(--muted); }
+
+/* TOAST */
+.toast-wrap { position: fixed; top: 60px; right: 18px; display: flex; flex-direction: column; gap: 7px; z-index: 9999; pointer-events: none; }
+.toast { background: var(--card); border: 1px solid var(--green); color: var(--green); padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; animation: ti .25s ease; max-width: 280px; }
+.toast.err { border-color: var(--red); color: var(--red); }
+.toast.warn { border-color: var(--amber); color: var(--amber); }
+@keyframes ti { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+.lbl { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">BKK1</span>
+  <button class="tab t1 active" onclick="switchTab(0)">🔵 ทีม 1 รับกลับ</button>
+  <button class="tab t2" onclick="switchTab(1)">🟣 ทีม 2 สถานะ</button>
+  <button class="tab t3" onclick="switchTab(2)">🟢 ทีม 3 ตรวจสอบ</button>
+  <div class="clock" id="clock">--:--:--</div>
+</nav>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ======= TEAM 1 ======= -->
+<div class="page active" id="page0">
+  <div class="box">
+    <div class="box-title">เลขออเดอร์รับกลับ</div>
+    <div class="row">
+      <input class="inp" id="orderInput" placeholder="Y260605029" style="max-width:260px" />
+      <div style="color:var(--muted);font-size:13px;align-self:center">เวลารับกลับ: <span id="liveTs" style="color:var(--accent);font-weight:600"></span></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="box-title">สแกน / คีย์ Set รับกลับ</div>
+    <div class="row">
+      <div class="ac-wrap">
+        <input class="inp" id="setInput" placeholder="พิมพ์หรือสแกน Set เช่น BPL65, RECIP21BPL" autocomplete="off" onkeydown="onSetKey(event)" oninput="onSetInput()" />
+        <div class="ac-dropdown" id="acDrop" style="display:none"></div>
+      </div>
+      <button class="btn btn-primary" onclick="addItem()">➕ เพิ่ม</button>
+    </div>
+    <div id="matchInfo" style="display:none;margin-top:8px"></div>
+  </div>
+
+  <div class="tbl-wrap">
+    <div class="tbl-head">
+      <span class="tbl-head-title">รายการสินค้ารับกลับ</span>
+      <span id="itemCount" class="badge bg-blue">0 รายการ</span>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Set</th><th>Mat Desc</th><th>Final Code</th><th>Area</th><th>ประเภท</th><th></th></tr></thead>
+      <tbody id="itemsBody"><tr><td colspan="7" class="empty-state">ยังไม่มีรายการ</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="submit-bar">
+    <div style="flex:1">
+      <div class="lbl">ออเดอร์</div>
+      <div style="font-weight:700;color:var(--accent);font-size:15px" id="orderDisplay">—</div>
+    </div>
+    <div>
+      <div class="lbl">เวลารับกลับ</div>
+      <div style="font-weight:700;color:var(--accent2);font-size:13px" id="tsDisplay">—</div>
+    </div>
+    <button class="btn btn-success" onclick="submitOrder()">✅ ยืนยัน → ส่งทีม 2</button>
+    <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 ล้าง</button>
+  </div>
+</div>
+
+<!-- ======= TEAM 2 ======= -->
+<div class="page" id="page1">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+    <div style="font-size:15px;font-weight:700;">รายการรอเปลี่ยนสถานะ</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="t2Count" class="badge bg-purple">0 รายการ</span>
+      <button class="btn-export" onclick="exportPDF()">📄 Export PDF</button>
+    </div>
+  </div>
+  <div id="t2List"><div class="empty-state">รอทีม 1 ส่งออเดอร์</div></div>
+</div>
+
+<!-- ======= TEAM 3 ======= -->
+<div class="page" id="page2">
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-label">ออเดอร์ทั้งหมด</div><div class="stat-val" id="s-total" style="color:var(--accent)">0</div></div>
+    <div class="stat-card"><div class="stat-label">ค้างดำเนินการ</div><div class="stat-val" id="s-pending" style="color:var(--amber)">0</div></div>
+    <div class="stat-card"><div class="stat-label">เสร็จสมบูรณ์</div><div class="stat-val" id="s-done" style="color:var(--green)">0</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="fbtn active" onclick="setFilter('all',this)">ทั้งหมด</button>
+    <button class="fbtn" onclick="setFilter('pending',this)">⏳ ค้าง</button>
+    <button class="fbtn" onclick="setFilter('done',this)">✅ เสร็จ</button>
+    <input type="date" class="date-inp" id="dateFrom" onchange="renderT3()" placeholder="จากวันที่" />
+    <input type="date" class="date-inp" id="dateTo" onchange="renderT3()" placeholder="ถึงวันที่" />
+    <input class="inp" id="searchQ" placeholder="🔍 ค้นหาออเดอร์ / Set" oninput="renderT3()" style="max-width:200px;padding:7px 12px;font-size:13px;" />
+    <button class="btn-export" onclick="exportExcel()">📊 Export Excel</button>
+  </div>
+
+  <div id="t3List"><div class="empty-state">ยังไม่มีออเดอร์</div></div>
+</div>
+
+<script>
+// ===== PRODUCT DATA =====
+const PRODUCTS = {"instrument":[{"Area":"BKK 1","Final Code":"121677285","Mat Desc":"ACTIS STEM","Set":"ACTIS1"},{"Area":"BKK 1","Final Code":"121677285","Mat Desc":"ACTIS STEM","Set":"ACTIS5"},{"Area":"BKK 1","Final Code":"121677285","Mat Desc":"ACTIS STEM","Set":"ACTIS7"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE109"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE12"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE13"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE16"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE19"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE20"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE22"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE25"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE37"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE41"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE49"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE58"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE59"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE60"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE68"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE71"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE80"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE87"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE88"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE95"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE96"},{"Area":"BKK 1","Final Code":"121677288","Mat Desc":"ATTUNE (8 TRAY)","Set":"ATTUNE97"},{"Area":"BKK 1","Final Code":"121677289","Mat Desc":"ATTUNE BALANCED FEMORAL (1 TRAY)","Set":"BALANCESIZER3"},{"Area":"BKK 1","Final Code":"121677301","Mat Desc":"ATTUNE MACRO (2 TRAY)","Set":"MACRO06"},{"Area":"BKK 1","Final Code":"121677301","Mat Desc":"ATTUNE MACRO (2 TRAY)","Set":"MACRO14"},{"Area":"BKK 1","Final Code":"121677301","Mat Desc":"ATTUNE MACRO (2 TRAY)","Set":"MACRO2"},{"Area":"BKK 1","Final Code":"121677301","Mat Desc":"ATTUNE MACRO (2 TRAY)","Set":"MACRO7"},{"Area":"BKK 1","Final Code":"121677302","Mat Desc":"ATTUNE MICRO SIZE 1 (1 TRAY)","Set":"MICRO1-11"},{"Area":"BKK 1","Final Code":"121677302","Mat Desc":"ATTUNE MICRO SIZE 1 (1 TRAY)","Set":"MICROSZ1-03"},{"Area":"BKK 1","Final Code":"121677302","Mat Desc":"ATTUNE MICRO SIZE 1 (1 TRAY)","Set":"MICROSZ1-04"},{"Area":"BKK 1","Final Code":"121677302","Mat Desc":"ATTUNE MICRO SIZE 1 (1 TRAY)","Set":"MICROSZ1-05"},{"Area":"BKK 1","Final Code":"121677302","Mat Desc":"ATTUNE MICRO SIZE 1 (1 TRAY)","Set":"MICROSZ1-07"},{"Area":"BKK 1","Final Code":"121677302","Mat Desc":"ATTUNE MICRO SIZE 1 (1 TRAY)","Set":"MICROSZ1-08"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-01"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-03"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-05"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-07"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-11"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-15"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-18"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-25"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-28"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-33"},{"Area":"BKK 1","Final Code":"121677303","Mat Desc":"ATTUNE MICRO SZ 2 (1 TRAY)","Set":"MICROSZ2-9"},{"Area":"BKK 1","Final Code":"121677304","Mat Desc":"ATTUNE MIS (1 TRAY)","Set":"MIS12"},{"Area":"BKK 1","Final Code":"121677304","Mat Desc":"ATTUNE MIS (1 TRAY)","Set":"MIS16"},{"Area":"BKK 1","Final Code":"121677304","Mat Desc":"ATTUNE MIS (1 TRAY)","Set":"MIS17"},{"Area":"BKK 1","Final Code":"121677304","Mat Desc":"ATTUNE MIS (1 TRAY)","Set":"MIS18"},{"Area":"BKK 1","Final Code":"121677304","Mat Desc":"ATTUNE MIS (1 TRAY)","Set":"MIS8"},{"Area":"BKK 1","Final Code":"121677305","Mat Desc":"ATTUNE MS (2 TRAY)","Set":"MS01"},{"Area":"BKK 1","Final Code":"121677305","Mat Desc":"ATTUNE MS (2 TRAY)","Set":"MS2"},{"Area":"BKK 1","Final Code":"121676978","Mat Desc":"ATTUNE MS OUTLIER (2 TR)","Set":"OUTLIER2"},{"Area":"BKK 1","Final Code":"121676978","Mat Desc":"ATTUNE MS OUTLIER (2 TR)","Set":"OUTLIER3"},{"Area":"BKK 1","Final Code":"121677315","Mat Desc":"BIMENTUM SCREW (1 TRAY)","Set":"BIMENTUM3"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPL+RE16"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPL+RE29"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPL+RE31ไม่มีRE"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPL+RE52"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPL+RE57"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPL+RE58"},{"Area":"BKK 1","Final Code":"121677316","Mat Desc":"BPL +RE (1 TRAY)","Set":"BPLRE27"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL102"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL116"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL12"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL120"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL121"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL124"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL125"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL30"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL35"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL45"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL65"},{"Area":"BKK 1","Final Code":"121675528","Mat Desc":"BPL BATTERY","Set":"BPL87"},{"Area":"BKK 1","Final Code":"121677318","Mat Desc":"BPL RECIP (1 TRAY)","Set":"RECIP17 BPL"},{"Area":"BKK 1","Final Code":"121677318","Mat Desc":"BPL RECIP (1 TRAY)","Set":"RECIP21BPL"},{"Area":"BKK 1","Final Code":"121677318","Mat Desc":"BPL RECIP (1 TRAY)","Set":"RECIP22BPL"},{"Area":"BKK 1","Final Code":"121677011","Mat Desc":"CERAMIC LINER (1 TR)","Set":"CERAMICLINER2"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL06"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL11"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL16"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL18"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL21"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL27"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL34"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL36"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL37"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL39"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL50"},{"Area":"BKK 1","Final Code":"121677325","Mat Desc":"CORAIL (1 TRAY)","Set":"CORAIL7"},{"Area":"BKK 1","Final Code":"121677326","Mat Desc":"CORAIL DAA (1 TRAY)","Set":"CORAIL DAA 22"},{"Area":"BKK 1","Final Code":"121677326","Mat Desc":"CORAIL DAA (1 TRAY)","Set":"DAA16"},{"Area":"BKK 1","Final Code":"121677326","Mat Desc":"CORAIL DAA (1 TRAY)","Set":"DAA8"},{"Area":"BKK 1","Final Code":"121677327","Mat Desc":"CORAIL SIZE6 (1 TRAY)","Set":"CORAILSZ6-07"},{"Area":"BKK 1","Final Code":"121677327","Mat Desc":"CORAIL SIZE6 (1 TRAY)","Set":"CORAILSZ6-4"},{"Area":"BKK 1","Final Code":"121676958","Mat Desc":"CORAIL SZ 18 (1 TR)","Set":"CORAILSZ18"},{"Area":"BKK 1","Final Code":"121677329","Mat Desc":"CORKSCREW (1 TRAY)","Set":"CROCKSCREW3"},{"Area":"BKK 1","Final Code":"121677333","Mat Desc":"C-STEM AMT NEW (1 TRAY)","Set":"C STEM AMT  NEW 7"},{"Area":"BKK 1","Final Code":"121677347","Mat Desc":"FEMORAL RASP (1 TRAY)","Set":"FEMORALSIZER4"},{"Area":"BKK 1","Final Code":"121677347","Mat Desc":"FEMORAL RASP (1 TRAY)","Set":"FEMORALSIZER5"},{"Area":"BKK 1","Final Code":"121677349","Mat Desc":"FEMUR HP (1 TRAY)","Set":"ตัวยกFEMUR11"},{"Area":"BKK 1","Final Code":"121677349","Mat Desc":"FEMUR HP (1 TRAY)","Set":"ตัวยกFEMUR13"},{"Area":"BKK 1","Final Code":"121677349","Mat Desc":"FEMUR HP (1 TRAY)","Set":"ตัวยกFEMUR16"},{"Area":"BKK 1","Final Code":"121677349","Mat Desc":"FEMUR HP (1 TRAY)","Set":"ตัวยกFEMUR19"},{"Area":"BKK 1","Final Code":"121677349","Mat Desc":"FEMUR HP (1 TRAY)","Set":"ตัวยกFEMUR21"},{"Area":"BKK 1","Final Code":"121677349","Mat Desc":"FEMUR HP (1 TRAY)","Set":"ตัวยกFEMUR8"},{"Area":"BKK 1","Final Code":"121677360","Mat Desc":"HANDLE OFFSET CUP","Set":"HANDLEOFFSET1"},{"Area":"BKK 1","Final Code":"121677365","Mat Desc":"HOHMAN RETRACTOR (1 TRAY)","Set":"HOHMAN10"},{"Area":"BKK 1","Final Code":"121677365","Mat Desc":"HOHMAN RETRACTOR (1 TRAY)","Set":"HOHMAN11"},{"Area":"BKK 1","Final Code":"121677365","Mat Desc":"HOHMAN RETRACTOR (1 TRAY)","Set":"HOHMAN4"},{"Area":"BKK 1","Final Code":"121677365","Mat Desc":"HOHMAN RETRACTOR (1 TRAY)","Set":"HOHMAN8"},{"Area":"BKK 1","Final Code":"121677378","Mat Desc":"LAMINA SPREADER (1 TRAY)","Set":"LAMINA37"},{"Area":"BKK 1","Final Code":"121677378","Mat Desc":"LAMINA SPREADER (1 TRAY)","Set":"LAMINAR18"},{"Area":"BKK 1","Final Code":"121677378","Mat Desc":"LAMINA SPREADER (1 TRAY)","Set":"LAMINAR41"},{"Area":"BKK 1","Final Code":"121677378","Mat Desc":"LAMINA SPREADER (1 TRAY)","Set":"LAMINAR42"},{"Area":"BKK 1","Final Code":"121677378","Mat Desc":"LAMINA SPREADER (1 TRAY)","Set":"LAMINAR6"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MAK16"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK1"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK17"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK18"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK2"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK27"},{"Area":"BKK 1","Final Code":"121677387","Mat Desc":"MARK III (1 TRAY)","Set":"MARK41"},{"Area":"BKK 1","Final Code":"121677392","Mat Desc":"META PHYSEAL REAM","Set":"METHAPHYSEALREAM3"},{"Area":"BKK 1","Final Code":"121677395","Mat Desc":"MI-HIP (1 TRAY)","Set":"MIHIP2"},{"Area":"BKK 1","Final Code":"121677395","Mat Desc":"MI-HIP (1 TRAY)","Set":"MIHIP5"},{"Area":"BKK 1","Final Code":"121677399","Mat Desc":"MORELAND (2 TRAY)","Set":"MORELAND3"},{"Area":"BKK 1","Final Code":"121676980","Mat Desc":"NECK SEGMENT (1 TR)","Set":"NECKSEGMENT"},{"Area":"BKK 1","Final Code":"121676980","Mat Desc":"NECK SEGMENT (1 TR)","Set":"NECKSEGMENT9"},{"Area":"BKK 1","Final Code":"121677408","Mat Desc":"PATELLA CUTTING GUIDE (1 TRAY)","Set":"CUTTPAT03"},{"Area":"BKK 1","Final Code":"121677408","Mat Desc":"PATELLA CUTTING GUIDE (1 TRAY)","Set":"CUTTPAT05"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATELL"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATELLA10"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATELLA16"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATELLA20"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATELLA3"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATELLA9"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATTEL01"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATTEL05"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATTEL11"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATTEL18"},{"Area":"BKK 1","Final Code":"121677410","Mat Desc":"PATELLA SIGMA HP CUTTING (1 TRAY)","Set":"PATTELLA19"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE 31"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE15"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE25"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE29"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE30"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE38"},{"Area":"BKK 1","Final Code":"121677414","Mat Desc":"PINNACLE (5 TRAY)","Set":"PINNACLE6"},{"Area":"BKK 1","Final Code":"121677416","Mat Desc":"PINNACLE BANTUM (1 TRAY)","Set":"BANTUM3"},{"Area":"BKK 1","Final Code":"121677416","Mat Desc":"PINNACLE BANTUM (1 TRAY)","Set":"BANTUM4"},{"Area":"BKK 1","Final Code":"121677416","Mat Desc":"PINNACLE BANTUM (1 TRAY)","Set":"BANTUM5"},{"Area":"BKK 1","Final Code":"121677416","Mat Desc":"PINNACLE BANTUM (1 TRAY)","Set":"BANTUM7"},{"Area":"BKK 1","Final Code":"121677416","Mat Desc":"PINNACLE BANTUM (1 TRAY)","Set":"BANTUM8"},{"Area":"BKK 1","Final Code":"121677416","Mat Desc":"PINNACLE BANTUM (1 TRAY)","Set":"BANTUM9"},{"Area":"BKK 1","Final Code":"121677418","Mat Desc":"PINNACLE LG","Set":"PINLG01"},{"Area":"BKK 1","Final Code":"121677427","Mat Desc":"RESTRICTOR (1 TRAY)","Set":"RESTRICTOR14"},{"Area":"BKK 1","Final Code":"121677427","Mat Desc":"RESTRICTOR (1 TRAY)","Set":"RESTRICTOR23"},{"Area":"BKK 1","Final Code":"121677427","Mat Desc":"RESTRICTOR (1 TRAY)","Set":"RESTRICTOR5"},{"Area":"BKK 1","Final Code":"121677427","Mat Desc":"RESTRICTOR (1 TRAY)","Set":"RESTRICTOR9"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELF26"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELF3"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELF38"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELF40"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELF43"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELF46"},{"Area":"BKK 1","Final Code":"121677435","Mat Desc":"SELF (1 TRAY)","Set":"SELS25"},{"Area":"BKK 1","Final Code":"121677472","Mat Desc":"TENSION (1 TRAY)","Set":"TENSION2"},{"Area":"BKK 1","Final Code":"121677472","Mat Desc":"TENSION (1 TRAY)","Set":"TENSION3"},{"Area":"BKK 1","Final Code":"121677472","Mat Desc":"TENSION (1 TRAY)","Set":"TENSION4"},{"Area":"BKK 1","Final Code":"121677472","Mat Desc":"TENSION (1 TRAY)","Set":"TENSION6"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIA RETRACTOR 1"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIA RETRACTOR 24"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIA RETRACTOR 4"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIA RETRACTOR20"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIA3"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIA35"},{"Area":"BKK 1","Final Code":"121676947","Mat Desc":"TIBIAL RETRACTOR (1 TR)","Set":"TIBIARETRACTOR5"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR10"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR11"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR15"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR16"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR18"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR20"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR22"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR26"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR35"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR38"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR43"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR49"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR53"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR55"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR57"},{"Area":"BKK 1","Final Code":"121677474","Mat Desc":"TRIAL FEMUR & INSERT ATTUNE CR (2 TRAY)","Set":"CR60"},{"Area":"BKK 1","Final Code":"121677478","Mat Desc":"TRS POWER (1 TRAY)","Set":"TRS27"},{"Area":"BKK 1","Final Code":"121677478","Mat Desc":"TRS POWER (1 TRAY)","Set":"TRS58"},{"Area":"BKK 1","Final Code":"121677478","Mat Desc":"TRS POWER (1 TRAY)","Set":"TRS64"},{"Area":"BKK 1","Final Code":"121677478","Mat Desc":"TRS POWER (1 TRAY)","Set":"TRSRE12"},{"Area":"BKK 1","Final Code":"121677478","Mat Desc":"TRS POWER (1 TRAY)","Set":"TRSRE2"},{"Area":"BKK 1","Final Code":"121677478","Mat Desc":"TRS POWER (1 TRAY)","Set":"TRSRE54"},{"Area":"BKK 1","Final Code":"121677485","Mat Desc":"VRAS INSTRUMENT (1 TRAY)","Set":"VRAS10"},{"Area":"BKK 1","Final Code":"121677485","Mat Desc":"VRAS INSTRUMENT (1 TRAY)","Set":"VRAS9"}],"implant":[{"Area":"BKK 1","Final Code":"121673620","Mat Desc":"HACT01","Set":"HACT0105"},{"Area":"BKK 1","Final Code":"121673621","Mat Desc":"HACT02","Set":"HACT0203"},{"Area":"BKK 1","Final Code":"121673623","Mat Desc":"HACT04","Set":"HACT0401"},{"Area":"BKK 1","Final Code":"121673624","Mat Desc":"HALTRX01","Set":"HALTRX0103"},{"Area":"BKK 1","Final Code":"121673624","Mat Desc":"HALTRX01","Set":"HALTRX0109"},{"Area":"BKK 1","Final Code":"121673624","Mat Desc":"HALTRX01","Set":"HALTRX0112"},{"Area":"BKK 1","Final Code":"121673624","Mat Desc":"HALTRX01","Set":"HALTRX0113"},{"Area":"BKK 1","Final Code":"121673624","Mat Desc":"HALTRX01","Set":"HALTRX0114"},{"Area":"BKK 1","Final Code":"121673626","Mat Desc":"HART01","Set":"HART0103"},{"Area":"BKK 1","Final Code":"121673626","Mat Desc":"HART01","Set":"HART0115"},{"Area":"BKK 1","Final Code":"121673626","Mat Desc":"HART01","Set":"HART0128"},{"Area":"BKK 1","Final Code":"121673626","Mat Desc":"HART01","Set":"HART0131"},{"Area":"BKK 1","Final Code":"121673626","Mat Desc":"HART01","Set":"HART0135"},{"Area":"BKK 1","Final Code":"121673627","Mat Desc":"HBIM01","Set":"HBIM0103"},{"Area":"BKK 1","Final Code":"121673628","Mat Desc":"HBIM02","Set":"HBIM0203"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0103"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0105"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0107"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0110"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0121"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0127"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0131"},{"Area":"BKK 1","Final Code":"121673629","Mat Desc":"HCM01","Set":"HCM0136"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"HCM0308"},{"Area":"BKK 1","Final Code":"121673630","Mat Desc":"HCOR01","Set":"HCOR0102"},{"Area":"BKK 1","Final Code":"121673630","Mat Desc":"HCOR01","Set":"HCOR0103"},{"Area":"BKK 1","Final Code":"121673630","Mat Desc":"HCOR01","Set":"HCOR0113"},{"Area":"BKK 1","Final Code":"121673630","Mat Desc":"HCOR01","Set":"HCOR0123"},{"Area":"BKK 1","Final Code":"121673632","Mat Desc":"HCOR03","Set":"HCOR0303"},{"Area":"BKK 1","Final Code":"121673632","Mat Desc":"HCOR03","Set":"HCOR0305"},{"Area":"BKK 1","Final Code":"121673632","Mat Desc":"HCOR03","Set":"HCOR0307"},{"Area":"BKK 1","Final Code":"121673633","Mat Desc":"HCOR04","Set":"HCOR0413"},{"Area":"BKK 1","Final Code":"121673634","Mat Desc":"HCOR06","Set":"HCOR0601"},{"Area":"BKK 1","Final Code":"121673634","Mat Desc":"HCOR06","Set":"HCOR0604"},{"Area":"BKK 1","Final Code":"121673636","Mat Desc":"HCORCO01","Set":"HCORCO0113"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0101"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0103"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0104"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0105"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0108"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0109"},{"Area":"BKK 1","Final Code":"121673638","Mat Desc":"HCST01","Set":"HCST0110"},{"Area":"BKK 1","Final Code":"121673640","Mat Desc":"HCST03","Set":"HCST0304"},{"Area":"BKK 1","Final Code":"121673641","Mat Desc":"HCST04","Set":"HCST0401"},{"Area":"BKK 1","Final Code":"121673641","Mat Desc":"HCST04","Set":"HCST0404"},{"Area":"BKK 1","Final Code":"121673641","Mat Desc":"HCST04","Set":"HCST0405"},{"Area":"BKK 1","Final Code":"121673646","Mat Desc":"HGCM01","Set":"HGCM0104"},{"Area":"BKK 1","Final Code":"121673646","Mat Desc":"HGCM01","Set":"HGCM0105"},{"Area":"BKK 1","Final Code":"121673646","Mat Desc":"HGCM01","Set":"HGCM0107"},{"Area":"BKK 1","Final Code":"121673646","Mat Desc":"HGCM01","Set":"HGCM0109"},{"Area":"BKK 1","Final Code":"121673646","Mat Desc":"HGCM01","Set":"HGCM0110"},{"Area":"BKK 1","Final Code":"121673647","Mat Desc":"HGCS01","Set":"HGCS0104"},{"Area":"BKK 1","Final Code":"121673647","Mat Desc":"HGCS01","Set":"HGCS0105"},{"Area":"BKK 1","Final Code":"121673647","Mat Desc":"HGCS01","Set":"HGCS0110"},{"Area":"BKK 1","Final Code":"121673649","Mat Desc":"HHSM01","Set":"HHSM0103"},{"Area":"BKK 1","Final Code":"121673652","Mat Desc":"HPIN01","Set":"HPIN0105"},{"Area":"BKK 1","Final Code":"121673652","Mat Desc":"HPIN01","Set":"HPIN0108"},{"Area":"BKK 1","Final Code":"121673652","Mat Desc":"HPIN01","Set":"HPIN0112"},{"Area":"BKK 1","Final Code":"121673652","Mat Desc":"HPIN01","Set":"HPIN0122"},{"Area":"BKK 1","Final Code":"121673653","Mat Desc":"HPIN03","Set":"HPIN0301"},{"Area":"BKK 1","Final Code":"121673655","Mat Desc":"HPIN07","Set":"HPIN0704"},{"Area":"BKK 1","Final Code":"121673655","Mat Desc":"HPIN07","Set":"HPIN0712"},{"Area":"BKK 1","Final Code":"121673655","Mat Desc":"HPIN07","Set":"HPIN0718"},{"Area":"BKK 1","Final Code":"121673655","Mat Desc":"HPIN07","Set":"HPIN0721"},{"Area":"BKK 1","Final Code":"121673656","Mat Desc":"HPIN08","Set":"HPIN0806"},{"Area":"BKK 1","Final Code":"121673656","Mat Desc":"HPIN08","Set":"HPIN0807"},{"Area":"BKK 1","Final Code":"121673658","Mat Desc":"HPIN10","Set":"HPIN1004"},{"Area":"BKK 1","Final Code":"121673660","Mat Desc":"HPIN12","Set":"HPIN1203"},{"Area":"BKK 1","Final Code":"121673660","Mat Desc":"HPIN12","Set":"HPIN1206"},{"Area":"BKK 1","Final Code":"121673660","Mat Desc":"HPIN12","Set":"HPIN1211"},{"Area":"BKK 1","Final Code":"121673661","Mat Desc":"HPIN13","Set":"HPIN1303"},{"Area":"BKK 1","Final Code":"121673662","Mat Desc":"HPIN14","Set":"HPIN1402"},{"Area":"BKK 1","Final Code":"121673662","Mat Desc":"HPIN14","Set":"HPIN1406"},{"Area":"BKK 1","Final Code":"121673662","Mat Desc":"HPIN14","Set":"HPIN1413"},{"Area":"BKK 1","Final Code":"121673663","Mat Desc":"HPIN15","Set":"HPIN1502"},{"Area":"BKK 1","Final Code":"121673663","Mat Desc":"HPIN15","Set":"HPIN1504"},{"Area":"BKK 1","Final Code":"121673663","Mat Desc":"HPIN15","Set":"HPIN1506"},{"Area":"BKK 1","Final Code":"121673664","Mat Desc":"HPIN16","Set":"HPIN1601"},{"Area":"BKK 1","Final Code":"121673664","Mat Desc":"HPIN16","Set":"HPIN1604"},{"Area":"BKK 1","Final Code":"121673668","Mat Desc":"HSCRW01","Set":"HSCRW0102"},{"Area":"BKK 1","Final Code":"121673668","Mat Desc":"HSCRW01","Set":"HSCRW0103"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0105"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0109"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0116"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0122"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0133"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0134"},{"Area":"BKK 1","Final Code":"121673669","Mat Desc":"HSEL01","Set":"HSEL0135"},{"Area":"BKK 1","Final Code":"121675252","Mat Desc":"HSEL02","Set":"HSEL0201"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KAPSIMI0206"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KARPSMI0107"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0105"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0112"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0113"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0114"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0117"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0132"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0140"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0141"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0144"},{"Area":"BKK 1","Final Code":"121673671","Mat Desc":"KATCR01","Set":"KATCR0145"},{"Area":"BKK 1","Final Code":"121673672","Mat Desc":"KATCRL01","Set":"KATCRL0104"},{"Area":"BKK 1","Final Code":"121673672","Mat Desc":"KATCRL01","Set":"KATCRL0108"},{"Area":"BKK 1","Final Code":"121673672","Mat Desc":"KATCRL01","Set":"KATCRL0109"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0103"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0105"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0106"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0109"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0113"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0114"},{"Area":"BKK 1","Final Code":"121673673","Mat Desc":"KATCRMI01","Set":"KATCRMI0116"},{"Area":"BKK 1","Final Code":"121673674","Mat Desc":"KATCRMI02","Set":"KATCRMI0201"},{"Area":"BKK 1","Final Code":"121673674","Mat Desc":"KATCRMI02","Set":"KATCRMI0202"},{"Area":"BKK 1","Final Code":"121673674","Mat Desc":"KATCRMI02","Set":"KATCRMI0203"},{"Area":"BKK 1","Final Code":"121673674","Mat Desc":"KATCRMI02","Set":"KATCRMI0204"},{"Area":"BKK 1","Final Code":"121673675","Mat Desc":"KATCRRP01","Set":"KATCRRP0105"},{"Area":"BKK 1","Final Code":"121673676","Mat Desc":"KATCRRPL01","Set":"KATCRRPL0101"},{"Area":"BKK 1","Final Code":"121673682","Mat Desc":"KATMS01","Set":"KATMS0101"},{"Area":"BKK 1","Final Code":"121673682","Mat Desc":"KATMS01","Set":"KATMS0102"},{"Area":"BKK 1","Final Code":"121673682","Mat Desc":"KATMS01","Set":"KATMS0110"},{"Area":"BKK 1","Final Code":"121676953","Mat Desc":"KATMSMI02","Set":"KATMSMI0201"},{"Area":"BKK 1","Final Code":"121676953","Mat Desc":"KATMSMI02","Set":"KATMSMI0202"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0103"},{"Area":"BKK 1","Final Code":"121673687","Mat Desc":"KATPS01","Set":"KATPS0107"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0110"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0112"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0116"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0117"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0122"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0125"},{"Area":"BKK 1","Final Code":"121673687","Mat Desc":"KATPS01","Set":"KATPS0125"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0134"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0136"},{"Area":"BKK 1","Final Code":"121673687","Mat Desc":"KATPS01","Set":"KATPS0141"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0144"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0145"},{"Area":"BKK 1","Final Code":"121673687","Mat Desc":"KATPS01","Set":"KATPS0148"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0150"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0152"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0160"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPS0168"},{"Area":"BKK 1","Final Code":"121673687","Mat Desc":"KATPS01","Set":"KATPS0178"},{"Area":"BKK 1","Final Code":"121673687","Mat Desc":"KATPS01","Set":"KATPS0181"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPSL0101"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPSL0102"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPSL0103"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPSL0104"},{"Area":"BKK 1","Final Code":"121673688","Mat Desc":"KATPSL01","Set":"KATPSL0107"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0101"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0102"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0108"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0115"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0125"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0126"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0129"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0130"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0131"},{"Area":"BKK 1","Final Code":"121673689","Mat Desc":"KATPSMI01","Set":"KATPSMI0137"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0201"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0202"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0203"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0205"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0206"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0207"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0209"},{"Area":"BKK 1","Final Code":"121673690","Mat Desc":"KATPSMI02","Set":"KATPSMI0210"},{"Area":"BKK 1","Final Code":"121673691","Mat Desc":"KATPSRP01","Set":"KATPSRP0108"},{"Area":"BKK 1","Final Code":"121673692","Mat Desc":"KATPSRPL01","Set":"KATPSRPL0104"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0305"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0308"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0318"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0322"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0325"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0326"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0330"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0334"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0342"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0350"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0359"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0363"},{"Area":"BKK 1","Final Code":"121673705","Mat Desc":"KCM03","Set":"KCM0379"},{"Area":"BKK 1","Final Code":"121673706","Mat Desc":"KCMB01","Set":"KCMB0111"},{"Area":"BKK 1","Final Code":"121673762","Mat Desc":"VELYS01","Set":"VELYES0101"},{"Area":"BKK 1","Final Code":"121673762","Mat Desc":"VELYS01","Set":"VELYES0110"}]};
+
+const ALL_PRODUCTS = [
+  ...PRODUCTS.instrument.map(p=>({...p,type:'Instrument'})),
+  ...PRODUCTS.implant.map(p=>({...p,type:'Implant'}))
+];
+const LOOKUP = {};
+ALL_PRODUCTS.forEach(p=>{ if(p.Set) LOOKUP[p.Set.trim().toUpperCase()] = p; });
+
+// ===== STATE =====
+let currentItems = [];
+let orders = [];
+let t3Filter = 'all';
+let acIdx = -1;
+let startTs = null;
+
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('th-TH',{hour12:false});
+  const ts = now.toLocaleString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'});
+  document.getElementById('liveTs').textContent = ts;
+  if(!startTs) document.getElementById('tsDisplay').textContent = ts;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== TABS =====
+const tabs = document.querySelectorAll('.tab');
+const pages = document.querySelectorAll('.page');
+function switchTab(i) {
+  tabs.forEach((t,j)=>t.classList.toggle('active',i===j));
+  pages.forEach((p,j)=>p.classList.toggle('active',i===j));
+  if(i===1) renderT2();
+  if(i===2) renderT3();
+}
+
+// ===== AUTOCOMPLETE =====
+function onSetInput() {
+  const v = document.getElementById('setInput').value.trim();
+  acIdx = -1;
+  updateMatchInfo(v);
+  if(v.length < 1) { closeDrop(); return; }
+  const vu = v.toUpperCase();
+  const hits = ALL_PRODUCTS.filter(p=>p.Set && p.Set.toUpperCase().includes(vu)).slice(0,12);
+  if(!hits.length) { closeDrop(); return; }
+  const drop = document.getElementById('acDrop');
+  drop.style.display = 'block';
+  drop.innerHTML = hits.map((p,i)=>`
+    <div class="ac-item" onmousedown="pickAC(event,\'${p.Set.replace(/'/g,"\\'")}\')" data-idx="${i}">
+      <span class="ac-set">${highlight(p.Set,v)}</span>
+      <span class="ac-desc">${p['Mat Desc']||''}</span>
+      <span class="${p.type==='Instrument'?'ac-type-i':'ac-type-p'}">${p.type==='Instrument'?'INS':'IMP'}</span>
+    </div>`).join('');
+}
+
+function highlight(str, q) {
+  const i = str.toUpperCase().indexOf(q.toUpperCase());
+  if(i<0) return str;
+  return str.slice(0,i)+'<mark style="background:#2a4480;color:#fff;border-radius:3px">'+str.slice(i,i+q.length)+'</mark>'+str.slice(i+q.length);
+}
+
+function onSetKey(e) {
+  const drop = document.getElementById('acDrop');
+  const items = drop.querySelectorAll('.ac-item');
+  if(e.key==='ArrowDown') { acIdx=Math.min(acIdx+1,items.length-1); highlightAC(items); e.preventDefault(); }
+  else if(e.key==='ArrowUp') { acIdx=Math.max(acIdx-1,-1); highlightAC(items); e.preventDefault(); }
+  else if(e.key==='Enter') {
+    if(acIdx>=0 && items[acIdx]) { items[acIdx].dispatchEvent(new MouseEvent('mousedown')); }
+    else addItem();
+    e.preventDefault();
+  }
+  else if(e.key==='Escape') closeDrop();
+}
+
+function highlightAC(items) {
+  items.forEach((el,i)=>el.style.background=i===acIdx?'#2a3060':'');
+  if(items[acIdx]) items[acIdx].scrollIntoView({block:'nearest'});
+}
+
+function pickAC(e, setVal) {
+  e.preventDefault();
+  document.getElementById('setInput').value = setVal;
+  closeDrop();
+  updateMatchInfo(setVal);
+}
+
+function closeDrop() { document.getElementById('acDrop').style.display='none'; }
+
+function updateMatchInfo(v) {
+  if(!v) { document.getElementById('matchInfo').style.display='none'; return; }
+  const m = LOOKUP[v.toUpperCase()];
+  const el = document.getElementById('matchInfo');
+  if(m) {
+    el.className='match-info';
+    el.style.display='block';
+    el.innerHTML=`✅ พบ: <strong>${m.Set}</strong> — ${m['Mat Desc']} | ${m.type} | Final Code: ${m['Final Code']} | Area: ${m.Area||'—'}`;
+  } else {
+    el.style.display='none';
+  }
+}
+
+// ===== TEAM 1 LOGIC =====
+function addItem() {
+  closeDrop();
+  const setVal = document.getElementById('setInput').value.trim();
+  if(!setVal) { toast('กรุณาระบุ Set','warn'); return; }
+  const found = LOOKUP[setVal.toUpperCase()];
+  if(!found) {
+    currentItems.push({Set:setVal,'Mat Desc':'—','Final Code':'—',Area:'—',type:'?'});
+    toast('⚠️ ไม่พบในระบบ — บันทึก Manual','warn');
+  } else {
+    currentItems.push({...found});
+    toast('✅ เพิ่ม '+found.Set);
+  }
+  if(!startTs) {
+    startTs = new Date().toLocaleString('th-TH',{hour12:false});
+    document.getElementById('tsDisplay').textContent = startTs;
+  }
+  document.getElementById('setInput').value='';
+  document.getElementById('matchInfo').style.display='none';
+  renderItems();
+  document.getElementById('setInput').focus();
+}
+
+function removeItem(i) { currentItems.splice(i,1); renderItems(); }
+
+function renderItems() {
+  const orderNo = document.getElementById('orderInput').value.trim();
+  document.getElementById('orderDisplay').textContent = orderNo||'—';
+  document.getElementById('itemCount').textContent = currentItems.length+' รายการ';
+  const tbody = document.getElementById('itemsBody');
+  if(!currentItems.length) {
+    tbody.innerHTML='<tr><td colspan="7" class="empty-state">ยังไม่มีรายการ — สแกนหรือคีย์ Set</td></tr>';
+    return;
+  }
+  tbody.innerHTML = currentItems.map((it,i)=>`
+    <tr>
+      <td style="color:var(--muted);font-size:12px">${i+1}</td>
+      <td><strong>${it.Set}</strong></td>
+      <td>${it['Mat Desc']}</td>
+      <td style="font-size:11px;color:var(--muted)">${it['Final Code']}</td>
+      <td>${it.Area&&it.Area!=='—'?'<span class=\"area-badge\">'+it.Area+'</span>':'—'}</td>
+      <td><span class="badge ${it.type==='Instrument'?'bg-blue':it.type==='Implant'?'bg-purple':'bg-amber'}">${it.type==='Instrument'?'INS':it.type==='Implant'?'IMP':'?'}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeItem(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function submitOrder() {
+  const orderNo = document.getElementById('orderInput').value.trim();
+  if(!orderNo) { toast('กรุณาระบุเลขออเดอร์','warn'); return; }
+  if(!currentItems.length) { toast('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ','warn'); return; }
+  const areaSet = [...new Set(currentItems.map(it=>it.Area).filter(a=>a&&a!=='—'))];
+  orders.push({
+    id: Date.now(),
+    orderNo,
+    items: [...currentItems],
+    receivedAt: startTs || new Date().toLocaleString('th-TH',{hour12:false}),
+    receivedDate: new Date().toISOString().slice(0,10),
+    status:'pending',
+    photos:[null,null],
+    photoTs:[null,null],
+    selectedStatus:'',
+    doneAt:null,
+    areas: areaSet,
+  });
+  toast('✅ ส่งออเดอร์ '+orderNo+' ไปทีม 2!');
+  clearAll();
+}
+
+function clearAll() {
+  currentItems=[];
+  startTs=null;
+  document.getElementById('orderInput').value='';
+  document.getElementById('setInput').value='';
+  document.getElementById('matchInfo').style.display='none';
+  document.getElementById('tsDisplay').textContent='—';
+  renderItems();
+}
+
+// ===== TEAM 2 =====
+function renderT2() {
+  const pending = orders.filter(o=>o.status==='pending');
+  document.getElementById('t2Count').textContent = pending.length+' รายการ';
+  const el = document.getElementById('t2List');
+  if(!pending.length) { el.innerHTML='<div class="empty-state">✅ ไม่มีออเดอร์ค้าง</div>'; return; }
+  el.innerHTML = pending.map(o=>orderCard(o)).join('');
+}
+
+function orderCard(o) {
+  return `
+  <div class="order-card" id="card-${o.id}">
+    <div class="order-card-head">
+      <div style="flex:1">
+        <span class="order-no">${o.orderNo}</span>
+        <div class="order-meta">
+          ${o.areas&&o.areas.length?o.areas.map(a=>`<span class="area-badge">${a}</span>`).join(''):''}
+          <span class="ts-chip">🕐 รับกลับ: ${o.receivedAt}</span>
+          <span class="ts-chip" id="elapsed-${o.id}"></span>
+        </div>
+        <div class="chips" style="margin-top:8px">
+          ${o.items.map(it=>`<span class="chip">${it.Set}${it['Mat Desc']!=='—'?' · '+it['Mat Desc']:''}</span>`).join('')}
+        </div>
+      </div>
+      <span class="badge bg-amber" style="margin-left:8px;white-space:nowrap">⏳ ค้าง</span>
+    </div>
+    <div class="order-body">
+      <div class="photo-label">แนบรูปหลักฐาน 2 ระบบ</div>
+      <div class="photos-grid">
+        ${[0,1].map(slot=>`
+          <div>
+            <div class="photo-label">ระบบ ${slot+1}</div>
+            <div class="photo-slot">
+              <input type="file" accept="image/*" onchange="handlePhoto(event,${o.id},${slot})">
+              ${o.photos[slot]
+                ?`<img src="${o.photos[slot]}"><button class="rm" onclick="event.stopPropagation();removePhoto(${o.id},${slot})">✕</button>`
+                :`<span style="font-size:20px">📷</span><span>อัพโหลดรูป</span>`}
+            </div>
+            ${o.photoTs[slot]?`<div class="photo-ts">🕐 ${o.photoTs[slot]}</div>`:''}
+          </div>`).join('')}
+      </div>
+      <div class="action-row">
+        <select onchange="setOrderStatus(${o.id},this.value)">
+          <option value="">— เลือกสถานะ —</option>
+          <option value="เปลี่ยนสถานะแล้ว" ${o.selectedStatus==='เปลี่ยนสถานะแล้ว'?'selected':''}>เปลี่ยนสถานะแล้ว</option>
+          <option value="รอยืนยัน" ${o.selectedStatus==='รอยืนยัน'?'selected':''}>รอยืนยัน</option>
+          <option value="มีปัญหา" ${o.selectedStatus==='มีปัญหา'?'selected':''}>มีปัญหา</option>
+        </select>
+        <button class="btn btn-success" onclick="markDone(${o.id})">✅ ดำเนินการเสร็จ</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function handlePhoto(e,id,slot) {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const o = orders.find(x=>x.id===id);
+    if(!o) return;
+    o.photos[slot]=ev.target.result;
+    o.photoTs[slot]=new Date().toLocaleString('th-TH',{hour12:false});
+    renderT2();
+    toast('📷 อัพโหลดรูประบบ '+(slot+1)+' เวลา '+o.photoTs[slot]);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(id,slot) {
+  const o=orders.find(x=>x.id===id);
+  if(!o) return;
+  o.photos[slot]=null; o.photoTs[slot]=null;
+  renderT2();
+}
+
+function setOrderStatus(id,val) {
+  const o=orders.find(x=>x.id===id);
+  if(!o) return;
+  o.selectedStatus=val;
+}
+
+function markDone(id) {
+  const o=orders.find(x=>x.id===id);
+  if(!o) return;
+  if(!o.photos[0]&&!o.photos[1]) { toast('กรุณาแนบรูปอย่างน้อย 1 รูป','warn'); return; }
+  o.status='done';
+  o.doneAt=new Date().toLocaleString('th-TH',{hour12:false});
+  toast('✅ ออเดอร์ '+o.orderNo+' เสร็จสมบูรณ์!');
+  renderT2();
+  renderT3Stats();
+}
+
+// Elapsed timer for pending cards
+setInterval(()=>{
+  orders.filter(o=>o.status==='pending').forEach(o=>{
+    const el=document.getElementById('elapsed-'+o.id);
+    if(!el) return;
+    const diff = Math.floor((Date.now()-o.id)/1000);
+    const h=Math.floor(diff/3600), m=Math.floor((diff%3600)/60), s=diff%60;
+    const txt = h?`${h}ชม. ${m}น.`:`${m}น. ${s}ว.`;
+    el.textContent = '⏱ '+txt;
+    el.style.color = diff>3600?'var(--red)':diff>1800?'var(--amber)':'var(--muted)';
+  });
+}, 1000);
+
+// ===== EXPORT PDF (Print) =====
+function exportPDF() {
+  const done = orders.filter(o=>o.status==='done');
+  if(!done.length) { toast('ยังไม่มีออเดอร์ที่เสร็จแล้ว','warn'); return; }
+  const win = window.open('','_blank');
+  win.document.write(`<html><head><title>BKK1 Return Report</title>
+  <style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px;}
+  h2{margin-bottom:12px;}table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+  th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;}th{background:#eee;}
+  .section{margin-bottom:24px;page-break-inside:avoid;}
+  </style></head><body>
+  <h2>BKK1 — รายงานรับกลับ (พิมพ์: ${new Date().toLocaleString('th-TH',{hour12:false})})</h2>
+  ${done.map(o=>`
+    <div class="section">
+      <h3>ออเดอร์: ${o.orderNo} | รับกลับ: ${o.receivedAt} | เสร็จ: ${o.doneAt}</h3>
+      <table><thead><tr><th>#</th><th>Set</th><th>Mat Desc</th><th>Final Code</th><th>Area</th><th>Type</th></tr></thead>
+      <tbody>${o.items.map((it,i)=>`<tr><td>${i+1}</td><td>${it.Set}</td><td>${it['Mat Desc']}</td><td>${it['Final Code']}</td><td>${it.Area}</td><td>${it.type}</td></tr>`).join('')}</tbody>
+      </table>
+      <div>รูปหลักฐาน: ${[0,1].map(s=>o.photos[s]?`ระบบ${s+1}: ${o.photoTs[s]}`:'').filter(Boolean).join(' | ')||'—'}</div>
+    </div>`).join('')}
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(), 400);
+}
+
+// ===== TEAM 3 =====
+function setFilter(f, el) {
+  t3Filter=f;
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderT3();
+}
+
+function renderT3Stats() {
+  document.getElementById('s-total').textContent=orders.length;
+  document.getElementById('s-pending').textContent=orders.filter(o=>o.status==='pending').length;
+  document.getElementById('s-done').textContent=orders.filter(o=>o.status==='done').length;
+}
+
+function renderT3() {
+  renderT3Stats();
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  const q = document.getElementById('searchQ').value.trim().toLowerCase();
+
+  let list = orders.filter(o=>{
+    if(t3Filter!=='all'&&o.status!==t3Filter) return false;
+    if(from&&o.receivedDate<from) return false;
+    if(to&&o.receivedDate>to) return false;
+    if(q) {
+      const combined = o.orderNo+' '+o.items.map(it=>it.Set+' '+it['Mat Desc']).join(' ');
+      if(!combined.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const el = document.getElementById('t3List');
+  if(!list.length) { el.innerHTML='<div class="empty-state">ไม่มีออเดอร์ที่ตรงเงื่อนไข</div>'; return; }
+
+  el.innerHTML = [...list].reverse().map(o=>{
+    const isDone=o.status==='done';
+    return `
+    <div class="order-card">
+      <div class="order-card-head">
+        <div style="flex:1">
+          <span class="order-no">${o.orderNo}</span>
+          <div class="order-meta">
+            ${o.areas&&o.areas.length?o.areas.map(a=>`<span class="area-badge">${a}</span>`).join(''):''}
+            <span class="ts-chip">🕐 รับกลับ: ${o.receivedAt}</span>
+            ${isDone?`<span class="ts-chip done">✅ เสร็จ: ${o.doneAt}</span>`:''}
+          </div>
+          <div class="chips" style="margin-top:6px">${o.items.map(it=>`<span class="chip">${it.Set}</span>`).join('')}</div>
+        </div>
+        <span class="badge ${isDone?'bg-green':'bg-amber'}" style="margin-left:8px;white-space:nowrap">${isDone?'✅ เสร็จ':'⏳ ค้าง'}</span>
+      </div>
+      ${isDone&&(o.photos[0]||o.photos[1])?`
+      <div class="order-body" style="display:flex;gap:12px;flex-wrap:wrap;">
+        ${o.photos[0]?`<div><img src="${o.photos[0]}" style="width:80px;height:64px;object-fit:cover;border-radius:7px"><div class="photo-ts">ระบบ 1 · ${o.photoTs[0]}</div></div>`:''}
+        ${o.photos[1]?`<div><img src="${o.photos[1]}" style="width:80px;height:64px;object-fit:cover;border-radius:7px"><div class="photo-ts">ระบบ 2 · ${o.photoTs[1]}</div></div>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ===== EXPORT EXCEL =====
+function exportExcel() {
+  if(!orders.length) { toast('ยังไม่มีข้อมูล','warn'); return; }
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  const q = document.getElementById('searchQ').value.trim().toLowerCase();
+
+  let list = orders.filter(o=>{
+    if(t3Filter!=='all'&&o.status!==t3Filter) return false;
+    if(from&&o.receivedDate<from) return false;
+    if(to&&o.receivedDate>to) return false;
+    if(q){const c=o.orderNo+' '+o.items.map(it=>it.Set+' '+it['Mat Desc']).join(' ');if(!c.toLowerCase().includes(q))return false;}
+    return true;
+  });
+
+  if(!list.length) { toast('ไม่มีข้อมูลที่กรอง','warn'); return; }
+
+  const rows = [];
+  list.forEach(o=>{
+    o.items.forEach((it,i)=>{
+      rows.push({
+        'ออเดอร์': o.orderNo,
+        'เวลารับกลับ': o.receivedAt,
+        'สถานะ': o.status==='done'?'เสร็จ':'ค้าง',
+        'เวลาเสร็จ': o.doneAt||'',
+        'Area': it.Area,
+        'Set': it.Set,
+        'Mat Desc': it['Mat Desc'],
+        'Final Code': it['Final Code'],
+        'ประเภท': it.type,
+        'รูประบบ1 เวลา': o.photoTs[0]||'',
+        'รูประบบ2 เวลา': o.photoTs[1]||'',
+      });
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Return Orders');
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `BKK1_Return_${today}.xlsx`);
+  toast('📊 Export Excel สำเร็จ!');
+}
+
+// ===== TOAST =====
+function toast(msg, type='ok') {
+  const w=document.getElementById('toastWrap');
+  const t=document.createElement('div');
+  t.className='toast'+(type==='warn'?' warn':type==='err'?' err':'');
+  t.textContent=msg;
+  w.appendChild(t);
+  setTimeout(()=>t.remove(), 3200);
+}
+
+// init
+renderItems();
+renderT3();
+</script>
+</body>
+</html>
